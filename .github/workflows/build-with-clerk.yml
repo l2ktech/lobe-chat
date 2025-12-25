@@ -5,9 +5,9 @@ on:
   push:
     branches:
       - next
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
+    paths:
+      - 'Dockerfile.clerk'
+      - '.github/workflows/build-with-clerk.yml'
 
 env:
   REGISTRY: docker.io
@@ -43,20 +43,17 @@ jobs:
             type=raw,value=latest
             type=sha,prefix={{branch}}-
       
-      - name: 构建并推送 Docker 镜像
+      - name: 构建并推送轻量级 Clerk 镜像
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./Dockerfile.clerk
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            NEXT_PUBLIC_ENABLE_CLERK_AUTH=1
             NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
       
       - name: 输出镜像信息
         run: |
@@ -66,14 +63,20 @@ jobs:
           echo "- **仓库**: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
           echo "- **标签**: latest, ${{ github.ref_name }}-${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⚠️ 重要说明" >> $GITHUB_STEP_SUMMARY
+          echo "这是基于官方镜像的轻量级构建，仅添加了 Clerk 环境变量。" >> $GITHUB_STEP_SUMMARY
+          echo "如果 Clerk 认证不生效，需要从源码完整构建。" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 使用方法" >> $GITHUB_STEP_SUMMARY
           echo '```yaml' >> $GITHUB_STEP_SUMMARY
+          echo "version: '3.8'" >> $GITHUB_STEP_SUMMARY
           echo "services:" >> $GITHUB_STEP_SUMMARY
           echo "  lobe-chat:" >> $GITHUB_STEP_SUMMARY
           echo "    image: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
           echo "    ports:" >> $GITHUB_STEP_SUMMARY
           echo "      - 3210:3210" >> $GITHUB_STEP_SUMMARY
           echo "    environment:" >> $GITHUB_STEP_SUMMARY
-          echo "      - CLERK_SECRET_KEY=你的密钥" >> $GITHUB_STEP_SUMMARY
-          echo "      - CLERK_WEBHOOK_SECRET=你的webhook密钥" >> $GITHUB_STEP_SUMMARY
+          echo "      - CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}" >> $GITHUB_STEP_SUMMARY
+          echo "      - CLERK_WEBHOOK_SECRET=your_webhook_secret" >> $GITHUB_STEP_SUMMARY
+          echo "      - APP_URL=http://localhost:3210" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
